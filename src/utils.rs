@@ -1,7 +1,7 @@
 //! A module for implementing some helpful functions for `monotree`.
 use crate::*;
 use num::{NumCast, PrimInt};
-use rand::Rng;
+// use rand::Rng;
 use std::cmp;
 use std::ops::Range;
 
@@ -77,42 +77,32 @@ macro_rules! perf {
 pub fn cast<T: NumCast, U: NumCast>(n: T) -> U {
     NumCast::from(n).expect("cast(): Numcast")
 }
-
-/// Generate a random byte based on `rand::random`.
-pub fn random_byte() -> u8 {
-    rand::random::<u8>()
-}
-
-/// Generate random bytes of the given length.
-pub fn random_bytes(n: usize) -> Vec<u8> {
-    (0..n).map(|_| random_byte()).collect()
-}
-
-/// Generate a random `Hash`, byte-array of `HASH_LEN` length.
-pub fn random_hash() -> Hash {
-    slice_to_hash(&random_bytes(HASH_LEN))
-}
-
-/// Generate a vector of random `Hash` with the given length.
-pub fn random_hashes(n: usize) -> Vec<Hash> {
-    (0..n).map(|_| random_hash()).collect()
-}
+//
+// /// Generate a random byte based on `rand::random`.
+// pub fn random_byte() -> u8 {
+//     rand::random::<u8>()
+// }
+//
+// /// Generate random bytes of the given length.
+// pub fn random_bytes(n: usize) -> Vec<u8> {
+//     (0..n).map(|_| random_byte()).collect()
+// }
+//
+// /// Generate a random `Hash`, byte-array of `HASH_LEN` length.
+// pub fn random_hash() -> Hash {
+//     slice_to_hash(&random_bytes(HASH_LEN))
+// }
+//
+// /// Generate a vector of random `Hash` with the given length.
+// pub fn random_hashes(n: usize) -> Vec<Hash> {
+//     (0..n).map(|_| random_hash()).collect()
+// }
 
 /// Get a fixed lenght byte-array or `Hash` from slice.
 pub fn slice_to_hash(slice: &[u8]) -> Hash {
     let mut hash = [0x00; HASH_LEN];
     hash.copy_from_slice(slice);
     hash
-}
-
-/// Shuffle a slice using _Fisher-Yates_ algorithm.
-pub fn shuffle<T: Clone>(slice: &mut [T]) {
-    let mut rng = rand::thread_rng();
-    let s = slice.len();
-    (0..s).for_each(|i| {
-        let q = rng.gen_range(0, s);
-        slice.swap(i, q);
-    });
 }
 
 /// Get sorted indices from unsorted slice.
