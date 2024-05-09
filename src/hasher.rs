@@ -11,10 +11,10 @@ pub trait Hasher {
 
 #[derive(Clone, Debug)]
 /// A hasher using `SHA2` hash function
-pub struct Sha2;
-impl Hasher for Sha2 {
+pub struct SimpleHash;
+impl Hasher for SimpleHash {
     fn new() -> Self {
-        Sha2
+        SimpleHash
     }
 
     /// Currently supports 256-bit or 32-byte only.

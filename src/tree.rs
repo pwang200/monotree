@@ -1,29 +1,26 @@
 //! A module implementing `monotree`.
 use crate::utils::*;
 use crate::*;
+use serde::{Serialize, Deserialize};
+use crate::hasher::Hasher;
 
 /// A structure for `monotree`.
-#[derive(Debug)]
-pub struct Monotree<D = DefaultDatabase, H = DefaultHasher> {
-    db: D,
-    hasher: H,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Monotree {
+    db: MemoryDB,
 }
 
-impl Default for Monotree<DefaultDatabase, DefaultHasher> {
+impl Default for Monotree {
     fn default() -> Self {
-        Self::new("monotree")
+        Self::new()
     }
 }
 
-impl<D, H> Monotree<D, H>
-where
-    D: Database,
-    H: Hasher,
+impl Monotree
 {
-    pub fn new(dbpath: &str) -> Self {
-        let db = Database::new(dbpath);
-        let hasher = Hasher::new();
-        Monotree { db, hasher }
+    pub fn new() -> Self {
+        let db = MemoryDB::new();
+        Monotree { db}
     }
 
     /// Insert key-leaf entry into the `monotree`. Returns a new root hash.
@@ -38,8 +35,9 @@ where
     }
 
     fn put_node(&mut self, node: Node) -> Result<Option<Hash>> {
+        let hasher = SimpleHash::new();
         let bytes = node.to_bytes()?;
-        let hash = self.hasher.digest(&bytes);
+        let hash = hasher.digest(&bytes);
         self.db.put(&hash, bytes)?;
         Ok(Some(hash))
     }
@@ -263,5 +261,110 @@ pub fn verify_proof<H: Hasher>(
             });
             root.expect("verify_proof(): root") == &hash
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct FakeRandom{
+        d : u8,
+    }
+
+    impl FakeRandom {
+        pub fn new() ->FakeRandom{
+            FakeRandom{d:0u8}
+        }
+
+        pub fn random_byte(&mut self) -> u8 {
+            self.d = self.d * 13 % 251;
+            self.d
+        }
+
+        pub fn random_bytes(&mut self, n: usize) -> Vec<u8> {
+            (0..n).map(|_| self.random_byte()).collect()
+        }
+
+        pub fn random_hash(&mut self) -> Hash {
+            slice_to_hash(&self.random_bytes(HASH_LEN))
+        }
+
+        pub fn random_hashes(&mut self, n: usize) -> Vec<Hash> {
+            (0..n).map(|_| self.random_hash()).collect()
+        }
+    }
+
+    /// Get a fixed lenght byte-array or `Hash` from slice.
+    pub fn slice_to_hash(slice: &[u8]) -> Hash {
+        let mut hash = [0x00; HASH_LEN];
+        hash.copy_from_slice(slice);
+        hash
+    }
+
+    #[test]
+    fn put_get_proof_work() {
+        let mut tree = Monotree::default();
+        let mut fr = FakeRandom::new();
+
+        // put and get
+        let root = None;
+        let n = 33usize;
+        let keys = fr.random_hashes(n);
+        let leaves = fr.random_hashes(n);
+        let root = tree.inserts(root.as_ref(), &keys, &leaves).unwrap();
+        let get_results = tree.gets(root.as_ref(), &keys).unwrap();
+        let rl = get_results.len();
+        assert_eq!(rl, n);
+        let get_third = get_results[n/3].unwrap();
+        assert!(!get_results.is_empty());
+        assert_eq!(leaves[n/3], get_third);
+        let key = keys[n/2];
+        let leaf = match tree.get(root.as_ref(), &key).unwrap() {
+            Some(l) => l,
+            _ => fr.random_hash(),
+        };
+        assert_eq!(leaves[n/2], leaf);
+
+        // Merkle proof
+        let proof = tree.get_merkle_proof(root.as_ref(), &key).unwrap();
+        let hasher = SimpleHash::new();
+        assert!(verify_proof(&hasher, root.as_ref(), &leaf, proof.as_ref()));
+    }
+
+    #[test]
+    fn serde_works() {
+        let mut tree = Monotree::default();
+        let mut fr = FakeRandom::new();
+
+        // put
+        let root = None;
+        let n = 57usize;
+        let keys = fr.random_hashes(n);
+        let leaves = fr.random_hashes(n);
+        let root = tree.inserts(root.as_ref(), &keys, &leaves).unwrap();
+
+        // serialization
+        let encoded: Vec<u8> = bincode::serialize(&tree).unwrap();
+        let mut decoded: Monotree = bincode::deserialize(&encoded[..]).unwrap();
+        let get_results = decoded.gets(root.as_ref(), &keys).unwrap();
+
+        for idx in 0..n {
+            let nr = get_results[idx].unwrap();
+            assert_eq!(nr, leaves[idx]);
+        }
+
+        // proof still works
+        let key = keys[n/2];
+        let leaf = match tree.get(root.as_ref(), &key).unwrap() {
+            Some(l) => l,
+            _ => fr.random_hash(),
+        };
+        assert_eq!(leaves[n/2], leaf);
+
+        // Merkle proof
+        let proof = tree.get_merkle_proof(root.as_ref(), &key).unwrap();
+        let hasher = SimpleHash::new();
+        assert!(verify_proof(&hasher, root.as_ref(), &leaf, proof.as_ref()));
     }
 }
