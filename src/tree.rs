@@ -239,12 +239,13 @@ impl Monotree
 ///
 /// Be aware of that it fails if not provided a suitable hasher used in the tree
 /// This generic fn must be independantly called upon request, not a member of Monotree.
-pub fn verify_proof<H: Hasher>(
-    hasher: &H,
+pub fn verify_proof(
+    //hasher: &H,
     root: Option<&Hash>,
     leaf: &Hash,
     proof: Option<&Proof>,
 ) -> bool {
+    let hasher = SimpleHash::new();
     match proof {
         None => false,
         Some(proof) => {
@@ -328,8 +329,9 @@ mod tests {
 
         // Merkle proof
         let proof = tree.get_merkle_proof(root.as_ref(), &key).unwrap();
-        let hasher = SimpleHash::new();
-        assert!(verify_proof(&hasher, root.as_ref(), &leaf, proof.as_ref()));
+        // let hasher = SimpleHash::new();
+        // assert!(verify_proof(&hasher, root.as_ref(), &leaf, proof.as_ref()));
+        assert!(verify_proof(root.as_ref(), &leaf, proof.as_ref()));
     }
 
     #[test]
@@ -364,7 +366,6 @@ mod tests {
 
         // Merkle proof
         let proof = tree.get_merkle_proof(root.as_ref(), &key).unwrap();
-        let hasher = SimpleHash::new();
-        assert!(verify_proof(&hasher, root.as_ref(), &leaf, proof.as_ref()));
+        assert!(verify_proof( root.as_ref(), &leaf, proof.as_ref()));
     }
 }
